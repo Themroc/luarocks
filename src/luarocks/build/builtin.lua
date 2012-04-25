@@ -7,6 +7,7 @@ local path = require("luarocks.path")
 local util = require("luarocks.util")
 local cfg = require("luarocks.cfg")
 local dir = require("luarocks.dir")
+local deps = require("luarocks.deps")
 
 --- Run a command displaying its execution on standard output.
 -- @return boolean: true if command succeeds (status code 0), false
@@ -158,6 +159,7 @@ function run(rockspec)
    local luadir = path.lua_dir(rockspec.name, rockspec.version)
    local libdir = path.lib_dir(rockspec.name, rockspec.version)
    local docdir = path.doc_dir(rockspec.name, rockspec.version)
+   local incdir = path.inc_dir(rockspec.name, rockspec.version)
    -- On Windows, compiles an .exe for each Lua file in build.install.bin, and
    -- replaces the filename with the .exe name. Strips the .lua extension if it exists,
    -- otherwise just appends .exe to the name
@@ -201,12 +203,17 @@ function run(rockspec)
          local sources = info.sources
          if info[1] then sources = info end
          if type(sources) == "string" then sources = {sources} end
+         local my_incdirs= type(info.incdirs)=="table" and info.incdirs or {}
+         local my_deps= deps.match_deps(rockspec)
+         for _, dep in pairs(my_deps) do
+            table.insert(my_incdirs, dir.path(cfg.rocks_dir, dep.name, dep.version, "include"))
+         end
          for _, source in ipairs(sources) do
             local object = source:gsub(".[^.]*$", "."..cfg.obj_extension)
             if not object then
                object = source.."."..cfg.obj_extension
             end
-            ok = compile_object(object, source, info.defines, info.incdirs)
+            ok = compile_object(object, source, info.defines, my_incdirs)
             if not ok then
                err = "Failed compiling object "..object
                break
@@ -214,6 +221,7 @@ function run(rockspec)
             table.insert(objects, object)
          end
          if not ok then break end
+
          local module_name = dir.path(moddir, name:match("([^.]*)$").."."..cfg.lib_extension):gsub("//", "/")
          if moddir ~= "" then
             fs.make_dir(moddir)
@@ -224,6 +232,14 @@ function run(rockspec)
          if not ok then
             err = "Failed compiling module "..module_name
             break
+         end
+
+         if info.includes then
+            local includes = info.includes
+            if type(includes) == "string" then includes = {includes} end
+            for _, include in ipairs(includes) do
+               built_modules[include] = dir.path(incdir, moddir)
+            end
          end
       end
    end

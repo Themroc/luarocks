@@ -193,6 +193,19 @@ function bin_dir(name, version, tree)
    return dir.path(rocks_dir(tree), name, version, "bin")
 end
 
+--- Get the local installation directory for reuseable headers of a package.
+-- @param name string: The package name. 
+-- @param version string: The package version.
+-- @param tree string or nil: If given, specifies the local tree to use.
+-- @return string: The resulting path -- does not guarantee that
+-- the package (and by extension, the path) exists.
+function inc_dir(name, version, tree)
+   assert(type(name) == "string")
+   assert(type(version) == "string")
+   tree = tree or cfg.root_dir
+   return dir.path(rocks_dir(tree), name, version, "include")
+end
+
 --- Extract name, version and arch of a rock filename,
 -- or name, version and "rockspec" from a rockspec name.
 -- @param file_name string: pathname of a rock or rockspec
