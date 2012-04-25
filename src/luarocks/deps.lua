@@ -314,42 +314,43 @@ end
 -- or nil if it could not be matched.
 local function match_dep(dep, blacklist)
    assert(type(dep) == "table")
-
-   local versions
-   if dep.name == "lua" then
-      versions = { cfg.lua_version }
-   else
-      versions = manif_core.get_versions(dep.name)
-   end
-   if not versions then
-      return nil
-   end
-   if blacklist then
-      local i = 1
-      while versions[i] do
-         if blacklist[versions[i]] then
-            table.remove(versions, i)
-         else
-            i = i + 1
+   local candidates = {}
+   
+   for _, tree in ipairs(cfg.rocks_trees) do
+      local versions = dep.name == "lua"
+         and { cfg.lua_version }
+         or manif_core.get_versions(dep.name, manif_core.load_local_manifest(path.rocks_dir(tree)))
+      if versions then
+         if blacklist then
+            local i = 1
+            while versions[i] do
+               if blacklist[versions[i]] then
+                  table.remove(versions, i)
+               else
+                  i = i + 1
+               end
+            end
+         end
+         for _, vstring in ipairs(versions) do
+            local version = parse_version(vstring)
+            if match_constraints(version, dep.constraints) then
+               version.tree= tree
+               table.insert(candidates, version)
+            end
          end
       end
    end
-   local candidates = {}
-   for _, vstring in ipairs(versions) do
-      local version = parse_version(vstring)
-      if match_constraints(version, dep.constraints) then
-         table.insert(candidates, version)
-      end
-   end
+
    if #candidates == 0 then
       return nil
-   else
-      table.sort(candidates)
-      return {
-         name = dep.name,
-         version = candidates[#candidates].string
-      }
    end
+
+   table.sort(candidates)
+   return {
+      name = dep.name,
+      version = candidates[#candidates].string,
+      tree = candidates[#candidates].tree
+   }
 end
 
 --- Attempt to match dependencies of a rockspec to installed rocks.
@@ -358,8 +359,8 @@ end
 -- Table where keys are program names and values are tables where keys
 -- are program versions and values are 'true'.
 -- @return table, table: A table where keys are dependencies parsed
--- in table format and values are tables containing fields 'name' and
--- version' representing matches, and a table of missing dependencies
+-- in table format and values are tables containing fields 'name', 'version'
+-- and 'tree' representing matches, and a table of missing dependencies
 -- parsed as tables.
 function match_deps(rockspec, blacklist)
    assert(type(rockspec) == "table")

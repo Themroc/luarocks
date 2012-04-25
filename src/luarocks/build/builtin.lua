@@ -204,9 +204,11 @@ function run(rockspec)
          if info[1] then sources = info end
          if type(sources) == "string" then sources = {sources} end
          local my_incdirs= type(info.incdirs)=="table" and info.incdirs or {}
+         local my_deplibdirs= {}
          local my_deps= deps.match_deps(rockspec)
-         for _, dep in pairs(my_deps) do
-            table.insert(my_incdirs, dir.path(cfg.rocks_dir, dep.name, dep.version, "include"))
+         for i, dep in pairs(my_deps) do
+            table.insert(my_incdirs, dir.path(path.rocks_dir(dep.tree), dep.name, dep.version, "include"))
+            my_deplibdirs[dep.name]= path.deploy_lib_dir(dep.tree)
          end
          for _, source in ipairs(sources) do
             local object = source:gsub(".[^.]*$", "."..cfg.obj_extension)
@@ -228,6 +230,11 @@ function run(rockspec)
          end
          local dest = dir.path(libdir, moddir)
          built_modules[module_name] = dest
+         if info.deplibs then
+            for dep, lib in pairs(info.deplibs) do
+               table.insert(objects, dir.path(my_deplibdirs[dep], lib).."."..cfg.lib_extension)
+            end
+         end
          ok = compile_library(module_name, objects, info.libraries, info.libdirs, name)
          if not ok then
             err = "Failed compiling module "..module_name
